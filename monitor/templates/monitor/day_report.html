@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day-Wise Attendance Report</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --card-bg: rgba(22, 24, 35, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f5f6fa;
+            --text-secondary: #8f92a1;
+            --accent-primary: #6366f1;
+            --accent-primary-glow: rgba(99, 102, 241, 0.4);
+            --accent-green: #10b981;
+            --accent-green-glow: rgba(16, 185, 129, 0.3);
+            --accent-rose: #f43f5e;
+            --accent-rose-glow: rgba(244, 63, 94, 0.3);
+            --accent-amber: #f59e0b;
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Container */
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 1.25rem 2rem;
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.5rem;
+            box-shadow: 0 0 15px var(--accent-primary-glow);
+        }
+
+        .logo-text h1 {
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #ffffff, #dcdde1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 2px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Layout Grid */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            .layout-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sidebar Calendar Card */
+        .sidebar-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Custom Interactive Calendar CSS */
+        .calendar-wrapper {
+            width: 100%;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .calendar-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .calendar-nav-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .calendar-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            color: var(--text-primary);
+            background: transparent;
+            border: none;
+        }
+
+        .calendar-day:hover:not(.empty) {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .calendar-day.selected {
+            background: var(--accent-primary) !important;
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 0 10px var(--accent-primary-glow);
+        }
+
+        .calendar-day.today {
+            border: 1.5px solid var(--accent-primary);
+            color: var(--accent-primary);
+            font-weight: 700;
+        }
+
+        .calendar-day.empty {
+            cursor: default;
+            color: transparent;
+        }
+
+        /* Report Details Card */
+        .report-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .report-meta-info h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .report-meta-info p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Search input styling */
+        .search-wrapper {
+            position: relative;
+            width: 300px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            padding: 10px 16px 10px 40px;
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: var(--transition-smooth);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 10px var(--accent-primary-glow);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        /* Filter Chips Styles */
+        .filter-chips {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 1.75rem;
+            flex-wrap: wrap;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .filter-chip {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-chip:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        .filter-chip.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-primary-glow);
+        }
+
+        .filter-chip .count {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+        }
+
+        .filter-chip.active .count {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Table CSS */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            flex: 1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            padding: 1rem 1.25rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        td {
+            padding: 1.1rem 1.25rem;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        /* Badges & Tags */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-checked-out {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-single-punch {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-amber);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .badge-absent {
+            background: rgba(244, 63, 94, 0.1);
+            color: var(--accent-rose);
+            border: 1px solid rgba(244, 63, 94, 0.2);
+        }
+
+        .tag {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .tag-late {
+            background: rgba(244, 63, 94, 0.15);
+            color: var(--accent-rose);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+        }
+
+        .tag-early {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .row-absent {
+            opacity: 0.5;
+        }
+
+        /* Loading / Empty view state */
+        .placeholder-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+            flex: 1;
+        }
+
+        .placeholder-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            color: var(--accent-primary);
+        }
+
+        .placeholder-state h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Timeline & Details Styles */
+        .details-row {
+            background: rgba(255, 255, 255, 0.015);
+        }
+        
+        .details-container {
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .timeline-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            position: relative;
+            padding-left: 0.25rem;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 0.65rem 1.1rem;
+            border-radius: 12px;
+            gap: 12px;
+            position: relative;
+            transition: var(--transition-smooth);
+        }
+        
+        .timeline-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .timeline-badge {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.2);
+        }
+        
+        .timeline-badge.first-punch {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green-glow);
+        }
+        
+        .timeline-badge.last-punch {
+            background: var(--accent-primary);
+            box-shadow: 0 0 8px var(--accent-primary-glow);
+        }
+
+        .timeline-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .timeline-time {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .timeline-meta {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-top: 2px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .timeline-meta span {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        .btn-toggle-details {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-smooth);
+        }
+        
+        .btn-toggle-details:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .btn-toggle-details svg {
+            transition: var(--transition-smooth);
+        }
+        
+        .btn-toggle-details.active svg {
+            transform: rotate(180deg);
+            color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <div class="logo-icon">N</div>
+                <div class="logo-text">
+                    <h1>Day-Wise Attendance</h1>
+                    <p>Hikvision Report Center</p>
+                </div>
+            </div>
+            <div>
+                <a href="{% url 'monitor:dashboard' %}" class="btn">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"></path>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Layout Grid -->
+        <div class="layout-grid">
+            <!-- Sidebar Calendar -->
+            <div class="sidebar-card">
+                <div class="calendar-wrapper">
+                    <div class="calendar-header">
+                        <button class="calendar-nav-btn" onclick="prevMonth()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"></path>
+                            </svg>
+                        </button>
+                        <div id="calendar-month-year" class="calendar-title">June 2026</div>
+                        <button class="calendar-nav-btn" onclick="nextMonth()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div>
+                    </div>
+                    <div id="calendar-days-grid" class="calendar-days">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Card -->
+            <div class="report-card">
+                <div class="report-header">
+                    <div class="report-meta-info">
+                        <h2 id="report-title-date">12 June 2026</h2>
+                        <p id="report-stats">Loading attendance data...</p>
+                    </div>
+                    <div class="search-wrapper">
+                        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"></path>
+                        </svg>
+                        <input type="text" id="employee-search" class="search-input" placeholder="Search ID or Name..." oninput="filterAndRender()">
+                    </div>
+                </div>
+
+                <!-- Filter Chips -->
+                <div id="report-filter-wrapper" class="filter-chips hidden">
+                    <button class="filter-chip active" onclick="setFilter('all')" id="chip-all">All <span class="count" id="count-all">0</span></button>
+                    <button class="filter-chip" onclick="setFilter('present')" id="chip-present">Present <span class="count" id="count-present">0</span></button>
+                    <button class="filter-chip" onclick="setFilter('absent')" id="chip-absent">Absent <span class="count" id="count-absent">0</span></button>
+                    <button class="filter-chip" onclick="setFilter('checked-out')" id="chip-checked-out">Checked Out <span class="count" id="count-checked-out">0</span></button>
+                    <button class="filter-chip" onclick="setFilter('single-punch')" id="chip-single-punch">Single Punch <span class="count" id="count-single-punch">0</span></button>
+                    <button class="filter-chip" onclick="setFilter('late')" id="chip-late">Late Entry <span class="count" id="count-late">0</span></button>
+                    <button class="filter-chip" onclick="setFilter('early-exit')" id="chip-early-exit">Early Exit <span class="count" id="count-early-exit">0</span></button>
+                </div>
+
+                <!-- Table -->
+                <div id="report-data-view" class="table-container hidden">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Employee Name</th>
+                                <th>First Punch (In)</th>
+                                <th>Last Punch (Out)</th>
+                                <th>Working Duration</th>
+                                <th>Status</th>
+                                <th style="text-align: center; width: 80px;">Punches</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-table-body">
+                            <!-- Filled dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty View State -->
+                <div id="placeholder-empty" class="placeholder-state hidden">
+                    <div class="placeholder-icon">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"></path>
+                        </svg>
+                    </div>
+                    <h3>No Attendance Found</h3>
+                    <p>There are no employees matching this filter query.</p>
+                </div>
+
+                <!-- Loading View State -->
+                <div id="placeholder-loading" class="placeholder-state">
+                    <div class="placeholder-icon">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;">
+                            <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.1)" stroke-width="3"></circle>
+                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                        </svg>
+                    </div>
+                    <h3>Fetching Data</h3>
+                    <p>Connecting to database to extract logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        let selectedDate = new Date();
+        let attendanceRecords = [];
+        let currentFilter = 'all';
+
+        const monthNames = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ];
+
+        // Format dates consistently
+        function formatISO(date) {
+            let y = date.getFullYear();
+            let m = String(date.getMonth() + 1).padStart(2, '0');
+            let d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function formatDisplayDate(date) {
+            let day = date.getDate();
+            let month = monthNames[date.getMonth()];
+            let year = date.getFullYear();
+            return `${day} ${month} ${year}`;
+        }
+
+        // Calendar Render Logic
+        function renderCalendar() {
+            const monthYearEl = document.getElementById("calendar-month-year");
+            const daysGridEl = document.getElementById("calendar-days-grid");
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            monthYearEl.innerText = `${monthNames[month]} ${year}`;
+            daysGridEl.innerHTML = "";
+
+            // First day of the month
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            // Total days in month
+            const lastDay = new Date(year, month + 1, 0).getDate();
+
+            // Render empty days before the first day of month
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement("button");
+                emptyCell.className = "calendar-day empty";
+                daysGridEl.appendChild(emptyCell);
+            }
+
+            // Render days of the month
+            const today = new Date();
+            for (let day = 1; day <= lastDay; day++) {
+                const dayBtn = document.createElement("button");
+                dayBtn.className = "calendar-day";
+                dayBtn.innerText = day;
+
+                const thisDate = new Date(year, month, day);
+
+                // Highlight today
+                if (thisDate.toDateString() === today.toDateString()) {
+                    dayBtn.classList.add("today");
+                }
+
+                // Highlight selected date
+                if (thisDate.toDateString() === selectedDate.toDateString()) {
+                    dayBtn.classList.add("selected");
+                }
+
+                dayBtn.onclick = () => {
+                    // Update selection
+                    selectedDate = thisDate;
+                    document.querySelectorAll(".calendar-day").forEach(el => el.classList.remove("selected"));
+                    dayBtn.classList.add("selected");
+
+                    // Trigger Data Fetch
+                    fetchAttendanceReport(selectedDate);
+                };
+
+                daysGridEl.appendChild(dayBtn);
+            }
+        }
+
+        function prevMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        // Fetch Data from API
+        async function fetchAttendanceReport(date) {
+            const loadingPlaceholder = document.getElementById("placeholder-loading");
+            const emptyPlaceholder = document.getElementById("placeholder-empty");
+            const dataView = document.getElementById("report-data-view");
+            const titleDateEl = document.getElementById("report-title-date");
+            const statsEl = document.getElementById("report-stats");
+            const filterWrapper = document.getElementById("report-filter-wrapper");
+
+            titleDateEl.innerText = formatDisplayDate(date);
+            statsEl.innerText = "Loading attendance data...";
+
+            loadingPlaceholder.classList.remove("hidden");
+            emptyPlaceholder.classList.add("hidden");
+            dataView.classList.add("hidden");
+            filterWrapper.classList.add("hidden");
+
+            const dateStr = formatISO(date);
+
+            try {
+                const response = await fetch(`/api/report/day/?date=${dateStr}`);
+                const result = await response.json();
+
+                loadingPlaceholder.classList.add("hidden");
+
+                if (result.success && result.data.length > 0) {
+                    attendanceRecords = result.data;
+                    
+                    // Reset filter tab back to all
+                    currentFilter = 'all';
+                    document.querySelectorAll(".filter-chip").forEach(btn => btn.classList.remove("active"));
+                    document.getElementById("chip-all").classList.add("active");
+                    
+                    updateFilterCounts();
+                    filterAndRender();
+                    
+                    dataView.classList.remove("hidden");
+                    filterWrapper.classList.remove("hidden");
+                    statsEl.innerText = `Registry: ${result.total_employees} employees | Present: ${result.total_present} | Absent: ${result.total_absent}`;
+                } else {
+                    attendanceRecords = [];
+                    emptyPlaceholder.classList.remove("hidden");
+                    statsEl.innerText = "No employees found in registry.";
+                }
+            } catch (err) {
+                loadingPlaceholder.classList.add("hidden");
+                emptyPlaceholder.classList.remove("hidden");
+                statsEl.innerText = "Failed to fetch logs from server.";
+                console.error("Fetch report error:", err);
+            }
+        }
+
+        // Apply filters client-side
+        function setFilter(filterType) {
+            currentFilter = filterType;
+            document.querySelectorAll(".filter-chip").forEach(btn => btn.classList.remove("active"));
+            
+            const activeChip = document.getElementById(`chip-${filterType}`);
+            if (activeChip) {
+                activeChip.classList.add("active");
+            }
+            
+            filterAndRender();
+        }
+
+        function filterAndRender() {
+            const query = document.getElementById("employee-search").value.toLowerCase();
+            const emptyPlaceholder = document.getElementById("placeholder-empty");
+            const dataView = document.getElementById("report-data-view");
+
+            const filtered = attendanceRecords.filter(row => {
+                const matchesSearch = row.employee_id.toLowerCase().includes(query) || 
+                                      row.name.toLowerCase().includes(query);
+                if (!matchesSearch) return false;
+
+                if (currentFilter === 'all') return true;
+                if (currentFilter === 'present') return row.status !== 'Absent';
+                if (currentFilter === 'absent') return row.status === 'Absent';
+                if (currentFilter === 'checked-out') return row.status === 'Checked Out';
+                if (currentFilter === 'single-punch') return row.status === 'Single Punch';
+                if (currentFilter === 'late') return row.is_late === true;
+                if (currentFilter === 'early-exit') return row.is_early === true;
+
+                return true;
+            });
+
+            renderTable(filtered);
+
+            if (filtered.length === 0) {
+                emptyPlaceholder.classList.remove("hidden");
+                dataView.classList.add("hidden");
+            } else {
+                emptyPlaceholder.classList.add("hidden");
+                dataView.classList.remove("hidden");
+            }
+        }
+
+        function updateFilterCounts() {
+            let present = 0, absent = 0, checkedOut = 0, singlePunch = 0, late = 0, early = 0;
+
+            attendanceRecords.forEach(row => {
+                if (row.status === 'Absent') {
+                    absent++;
+                } else {
+                    present++;
+                    if (row.status === 'Checked Out') checkedOut++;
+                    if (row.status === 'Single Punch') singlePunch++;
+                    if (row.is_late) late++;
+                    if (row.is_early) early++;
+                }
+            });
+
+            document.getElementById("count-all").innerText = attendanceRecords.length;
+            document.getElementById("count-present").innerText = present;
+            document.getElementById("count-absent").innerText = absent;
+            document.getElementById("count-checked-out").innerText = checkedOut;
+            document.getElementById("count-single-punch").innerText = singlePunch;
+            document.getElementById("count-late").innerText = late;
+            document.getElementById("count-early-exit").innerText = early;
+        }
+
+        function getVerifyModeLabel(mode) {
+            const map = {
+                'face': 'Face Recognition',
+                'fp': 'Fingerprint',
+                'card': 'RFID Card',
+                'faceOrFpOrCardOrPw': 'Biometric/Card',
+                'faceOrFp': 'Face/Fingerprint',
+                'fpOrCard': 'Fingerprint/Card',
+                'faceOrCard': 'Face/Card'
+            };
+            return map[mode] || mode || 'Card/Face';
+        }
+
+        function toggleDetails(employeeId) {
+            const detailsRow = document.getElementById(`details-${employeeId}`);
+            const toggleBtn = document.getElementById(`btn-toggle-${employeeId}`);
+            if (detailsRow) {
+                const isHidden = detailsRow.classList.contains('hidden');
+                
+                // Collapse all other open detail rows to keep UI clean
+                document.querySelectorAll('.details-row').forEach(row => {
+                    if (row.id !== `details-${employeeId}`) {
+                        row.classList.add('hidden');
+                    }
+                });
+                document.querySelectorAll('.btn-toggle-details').forEach(btn => {
+                    if (btn.id !== `btn-toggle-${employeeId}`) {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                if (isHidden) {
+                    detailsRow.classList.remove('hidden');
+                    if (toggleBtn) toggleBtn.classList.add('active');
+                } else {
+                    detailsRow.classList.add('hidden');
+                    if (toggleBtn) toggleBtn.classList.remove('active');
+                }
+            }
+        }
+
+        // Render Report Table
+        function renderTable(data) {
+            const tableBody = document.getElementById("report-table-body");
+            tableBody.innerHTML = "";
+
+            data.forEach(row => {
+                const tr = document.createElement("tr");
+                const hasPunches = row.status !== 'Absent' && row.punches && row.punches.length > 0;
+                
+                if (row.status === 'Absent') {
+                    tr.className = "row-absent";
+                } else if (hasPunches) {
+                    tr.style.cursor = "pointer";
+                    tr.onclick = (e) => {
+                        toggleDetails(row.employee_id);
+                    };
+                }
+
+                let badgeClass = "badge-checked-out";
+                if (row.status === 'Single Punch') badgeClass = "badge-single-punch";
+                if (row.status === 'Absent') badgeClass = "badge-absent";
+
+                // Add late tag next to In Time
+                let inTimeHTML = row.in_time;
+                if (row.is_late) {
+                    inTimeHTML += ` <span class="tag tag-late">Late</span>`;
+                }
+
+                // Add early exit tag next to Out Time
+                let outTimeHTML = row.out_time;
+                if (row.is_early) {
+                    outTimeHTML += ` <span class="tag tag-early">Early Exit</span>`;
+                }
+
+                // Actions cell (chevron button)
+                let punchesBtnHTML = '-';
+                if (hasPunches) {
+                    punchesBtnHTML = `
+                        <button class="btn-toggle-details" id="btn-toggle-${row.employee_id}">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"></path>
+                            </svg>
+                        </button>
+                    `;
+                }
+
+                tr.innerHTML = `
+                    <td style="font-weight: 600;"><code>${row.employee_id}</code></td>
+                    <td><span style="font-weight: 600;">${row.name}</span></td>
+                    <td style="font-weight: 500; color: ${row.in_time === '-' ? 'var(--text-secondary)' : 'var(--accent-green)'};">${inTimeHTML}</td>
+                    <td style="font-weight: 500; color: ${row.out_time === '-' ? 'var(--text-secondary)' : 'var(--accent-primary)'};">${outTimeHTML}</td>
+                    <td style="font-weight: 500;">${row.duration}</td>
+                    <td>
+                        <span class="badge ${badgeClass}">
+                            <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; background: currentColor;"></span>
+                            ${row.status}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">${punchesBtnHTML}</td>
+                `;
+                tableBody.appendChild(tr);
+
+                // If present, render the details row right after the main row
+                if (hasPunches) {
+                    const detailsTr = document.createElement("tr");
+                    detailsTr.id = `details-${row.employee_id}`;
+                    detailsTr.className = "details-row hidden";
+                    
+                    const timelineItemsHTML = row.punches.map((p, idx) => {
+                        const isFirst = idx === 0;
+                        const isLast = idx === row.punches.length - 1 && row.punches.length > 1;
+                        let badgeClass = 'timeline-badge';
+                        if (isFirst) badgeClass += ' first-punch';
+                        else if (isLast) badgeClass += ' last-punch';
+                        
+                        return `
+                            <div class="timeline-item">
+                                <div class="${badgeClass}"></div>
+                                <div class="timeline-info">
+                                    <div class="timeline-time">${p.time}</div>
+                                    <div class="timeline-meta">
+                                        <span>Mode: ${getVerifyModeLabel(p.verify_mode)}</span>
+                                        <span>Serial: ${p.serial_no}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    detailsTr.innerHTML = `
+                        <td colspan="7" style="padding: 0;">
+                            <div class="details-container">
+                                <div class="timeline-title">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Daily Punch Timeline (${row.punches.length} punch${row.punches.length > 1 ? 'es' : ''})
+                                </div>
+                                <div class="timeline">
+                                    ${timelineItemsHTML}
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(detailsTr);
+                }
+            });
+        }
+
+        // Initialize Page
+        window.addEventListener("DOMContentLoaded", () => {
+            renderCalendar();
+            fetchAttendanceReport(selectedDate);
+        });
+    </script>
+
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>

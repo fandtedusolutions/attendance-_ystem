@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natdemy Live Attendance Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --card-bg: rgba(22, 24, 35, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f5f6fa;
+            --text-secondary: #8f92a1;
+            --accent-primary: #6366f1;
+            --accent-primary-glow: rgba(99, 102, 241, 0.4);
+            --accent-green: #10b981;
+            --accent-green-glow: rgba(16, 185, 129, 0.3);
+            --accent-rose: #f43f5e;
+            --accent-rose-glow: rgba(244, 63, 94, 0.3);
+            --accent-amber: #f59e0b;
+            
+            --sidebar-width: 280px;
+            --header-height: 80px;
+            
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Container */
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        /* Header section */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 1.25rem 2rem;
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.5rem;
+            box-shadow: 0 0 15px var(--accent-primary-glow);
+        }
+
+        .logo-text h1 {
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #ffffff, #dcdde1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .monitor-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+        }
+
+        .monitor-badge.active {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.06);
+            color: var(--accent-green);
+        }
+
+        .monitor-badge.offline {
+            border-color: rgba(244, 63, 94, 0.3);
+            background: rgba(244, 63, 94, 0.06);
+            color: var(--accent-rose);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .active .status-dot {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+            animation: pulse 1.8s infinite;
+        }
+
+        .offline .status-dot {
+            background-color: var(--accent-rose);
+            box-shadow: 0 0 10px var(--accent-rose);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Buttons */
+        .btn {
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(12px);
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: transparent;
+            transition: var(--transition-smooth);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .stat-card.total::before { background: linear-gradient(to right, var(--accent-primary), #3b82f6); }
+        .stat-card.present::before { background: linear-gradient(to right, var(--accent-green), #059669); }
+        .stat-card.absent::before { background: linear-gradient(to right, var(--accent-rose), #e11d48); }
+        .stat-card.latest::before { background: linear-gradient(to right, var(--accent-amber), #d97706); }
+
+        .stat-info h3 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .stat-info .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .stat-info .stat-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 190px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+        }
+
+        .total .stat-icon { color: var(--accent-primary); background: rgba(99, 102, 241, 0.1); }
+        .present .stat-icon { color: var(--accent-green); background: rgba(16, 185, 129, 0.1); }
+        .absent .stat-icon { color: var(--accent-rose); background: rgba(244, 63, 94, 0.1); }
+        .latest .stat-icon { color: var(--accent-amber); background: rgba(245, 158, 11, 0.1); }
+
+        /* Dashboard content layout */
+        .dashboard-content {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .content-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 1.75rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Feed list styling */
+        .feed-container {
+            max-height: 580px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .feed-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 14px;
+            margin-bottom: 0.75rem;
+            transition: var(--transition-smooth);
+            animation: slideIn 0.4s ease forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .feed-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: scale(1.01);
+        }
+
+        .feed-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.05));
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+            overflow: hidden;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .emp-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .emp-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .emp-details {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-subtle {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        .feed-right {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .punch-time {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .punch-mode {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+            background: rgba(99, 102, 241, 0.1);
+            padding: 3px 8px;
+            border-radius: 20px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            text-transform: uppercase;
+        }
+
+        /* Employee Directory Card */
+        .search-box {
+            position: relative;
+            width: 100%;
+            margin-bottom: 1.25rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px 10px 40px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: white;
+            font-family: inherit;
+            font-size: 0.85rem;
+            transition: var(--transition-smooth);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+        }
+
+        .emp-list {
+            max-height: 520px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .emp-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem 1rem;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            margin-bottom: 0.5rem;
+            background: rgba(255, 255, 255, 0.01);
+            transition: var(--transition-smooth);
+        }
+
+        .emp-row:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .emp-row-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .emp-row-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .emp-row.present-today .emp-row-avatar {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05));
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #a7f3d0;
+        }
+
+        .emp-row-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .emp-row-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .emp-row-sub {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .emp-row-right {
+            text-align: right;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+
+        .status-badge.present {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-badge.absent {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+        }
+
+        .emp-row-lastseen {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* empty states */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            gap: 12px;
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            opacity: 0.3;
+        }
+
+        /* Toast Message */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #181920;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: var(--transition-smooth);
+            z-index: 1000;
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success { border-color: var(--accent-green); }
+        .toast.error { border-color: var(--accent-rose); }
+
+        .spinner {
+            animation: rotate 1s linear infinite;
+            width: 16px;
+            height: 16px;
+        }
+
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        /* Offline instructions banner */
+        .offline-banner {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            color: #fbd38d;
+            font-size: 0.85rem;
+        }
+
+        .offline-banner code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: white;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <div class="logo-icon">N</div>
+                <div class="logo-text">
+                    <h1>Natdemy Attendance</h1>
+                    <p>Hikvision Live Access Monitoring</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div id="monitor-badge-container" class="monitor-badge {% if initial_data.status == 'Active' %}active{% else %}offline{% endif %}">
+                    <span class="status-dot"></span>
+                    <span id="monitor-status-text">MONITOR {{ initial_data.status|upper }}</span>
+                </div>
+
+                <button id="btn-sound" class="btn" onclick="toggleSound()" style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); color: var(--text-secondary);">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6L4.5 9H1.5v6h3l4.5 3.75V5.25z" id="sound-icon-path"></path>
+                    </svg>
+                    <span id="sound-text">Muted</span>
+                </button>
+
+                <a href="{% url 'monitor:day_report_page' %}" class="btn" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.3); color: #a5b4fc; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"></path>
+                    </svg>
+                    <span>Day Report</span>
+                </a>
+
+                <button id="btn-recover" class="btn" onclick="recoverToday()" style="background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); color: #fbd38d;" title="Fetch all missed punches from the device for today">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" id="recover-icon">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span id="recover-text">Recover Today</span>
+                </button>
+                
+                <button id="btn-sync" class="btn btn-primary" onclick="syncEmployees()">
+                    <svg class="spinner" style="display: none;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-dasharray="32" stroke-linecap="round"></circle>
+                    </svg>
+                    <span>Sync Device Employees</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Offline Help Banner -->
+        <div id="offline-banner" class="offline-banner" style="{% if initial_data.status == 'Active' %}display: none;{% endif %}">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+            <div>
+                <strong>Monitor worker is currently offline.</strong> Punch events will not be logged in real-time. Start the background monitoring worker by running:
+                <code>python manage.py monitor_device</code> in your terminal.
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="stat-info">
+                    <h3>Total Employees</h3>
+                    <div class="stat-value" id="stat-total">{{ initial_data.stats.total_employees }}</div>
+                    <div class="stat-desc">Registered in database</div>
+                </div>
+                <div class="stat-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="stat-card present">
+                <div class="stat-info">
+                    <h3>Checked In Today</h3>
+                    <div class="stat-value" id="stat-present">{{ initial_data.stats.present_today }}</div>
+                    <div class="stat-desc">Unique employee check-ins</div>
+                </div>
+                <div class="stat-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="stat-card absent">
+                <div class="stat-info">
+                    <h3>Not Punched Today</h3>
+                    <div class="stat-value" id="stat-absent">{{ initial_data.stats.absent_today }}</div>
+                    <div class="stat-desc">Employees remaining</div>
+                </div>
+                <div class="stat-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="stat-card latest">
+                <div class="stat-info">
+                    <h3>Latest Check-In</h3>
+                    <div class="stat-value" id="stat-latest-name" style="font-size: 1.25rem; font-weight: 700; height: 2.2rem; display: flex; align-items: center;">
+                        {{ initial_data.stats.last_punch_name }}
+                    </div>
+                    <div class="stat-desc" id="stat-latest-time">{{ initial_data.stats.last_punch_time }}</div>
+                </div>
+                <div class="stat-icon">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Content Grid -->
+        <div class="dashboard-content">
+            
+            <!-- Live Feed Card -->
+            <div class="content-card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">
+                            <span class="status-dot" style="background-color: var(--accent-primary); box-shadow: 0 0 8px var(--accent-primary-glow);"></span>
+                            Live Attendance Feed
+                        </h2>
+                        <span class="card-subtitle">Real-time punch activity logs</span>
+                    </div>
+                </div>
+
+                <div class="feed-container" id="feed-container">
+                    {% if initial_data.events %}
+                        {% for event in initial_data.events %}
+                            <div class="feed-item" data-serial="{{ event.serial_no }}">
+                                <div class="feed-left">
+                                    <div class="avatar">
+                                        {% if event.face_url %}
+                                            <img src="{{ event.face_url }}" alt="{{ event.name }}">
+                                        {% else %}
+                                            {{ event.name|slice:":2"|upper }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="emp-meta">
+                                        <div class="emp-name">{{ event.name }}</div>
+                                        <div class="emp-details">
+                                            <span>ID: {{ event.employee_id }}</span>
+                                            <span>&bull;</span>
+                                            <span class="badge-subtle">{{ event.user_type }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="feed-right">
+                                    <div class="punch-time">{{ event.time }}</div>
+                                    <div class="punch-mode">{{ event.verify_mode }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state" id="feed-empty-state">
+                            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <p style="font-weight: 600;">No attendance events registered yet.</p>
+                                <p style="font-size: 0.8rem; margin-top: 4px;">Punches will appear here automatically when employees scan in.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Employee Directory Card -->
+            <div class="content-card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">Employee Directory</h2>
+                        <span class="card-subtitle">Active registry status</span>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <span class="search-icon">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </span>
+                    <input type="text" id="employee-search" class="search-input" placeholder="Search employees by name or ID..." onkeyup="filterEmployees()">
+                </div>
+
+                <div class="emp-list" id="emp-list">
+                    {% if initial_data.employees %}
+                        {% for emp in initial_data.employees %}
+                            <div class="emp-row {% if emp.is_present_today %}present-today{% endif %}" data-name="{{ emp.name|lower }}" data-id="{{ emp.employee_id }}">
+                                <div class="emp-row-left">
+                                    <div class="emp-row-avatar">
+                                        {% if emp.face_url %}
+                                            <img src="{{ emp.face_url }}" alt="{{ emp.name }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">
+                                        {% else %}
+                                            {{ emp.name|slice:":2"|upper }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="emp-row-info">
+                                        <div class="emp-row-name">{{ emp.name }}</div>
+                                        <div class="emp-row-sub">ID: {{ emp.employee_id }} &bull; FP: {{ emp.num_fp }} &bull; Face: {{ emp.num_face }}</div>
+                                    </div>
+                                </div>
+                                <div class="emp-row-right">
+                                    <span class="status-badge {% if emp.is_present_today %}present{% else %}absent{% endif %}">
+                                        {% if emp.is_present_today %}Checked In{% else %}Absent{% endif %}
+                                    </span>
+                                    <div class="emp-row-lastseen">Seen: {{ emp.last_punch }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.386 11.386 0 0110.089 20c-2.202 0-4.277-.625-6.037-1.713v-.008a4.125 4.125 0 017.533-2.493M15 9.04a4.2 4.2 0 000-8.08M15 9.04a4.2 4.2 0 010-8.08M15 9.04v.006c0 1.585-.396 3.078-1.099 4.39M11.112 1.24a9.77 9.77 0 00-2.224.224 4.2 4.2 0 00-7.533 2.493 4.207 4.207 0 002.224 3.707M11.112 1.24v.003c0 .137.017.273.051.404m0-1.407A4.211 4.211 0 0112 5c0 1.29-.579 2.443-1.499 3.22M10.982 18.025a5.037 5.037 0 01-4.703-5.228h-.005A5.003 5.003 0 0110.98 7.794a5.004 5.004 0 014.707 5.008 5.004 5.004 0 01-4.705 5.223z"></path>
+                            </svg>
+                            <div>
+                                <p style="font-weight: 600;">No employees found.</p>
+                                <p style="font-size: 0.8rem; margin-top: 4px;">Click the sync button above to import employees from the Hikvision device.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast" class="toast">
+        <span id="toast-icon"></span>
+        <span id="toast-text"></span>
+    </div>
+
+    <!-- Scripting for live updates -->
+    <script>
+        // CSRF helper
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Show Toast
+        function showToast(text, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-text');
+            
+            toast.className = `toast show ${type}`;
+            msg.innerText = text;
+            
+            if (type === 'success') {
+                icon.innerHTML = `<svg width="18" height="18" fill="none" stroke="var(--accent-green)" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            } else {
+                icon.innerHTML = `<svg width="18" height="18" fill="none" stroke="var(--accent-rose)" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+            }
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        // Employee filter
+        function filterEmployees() {
+            const query = document.getElementById('employee-search').value.toLowerCase();
+            const rows = document.querySelectorAll('.emp-row');
+            
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name');
+                const id = row.getAttribute('data-id');
+                if (name.includes(query) || id.includes(query)) {
+                    row.style.display = 'flex';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Sync device employees
+        async function syncEmployees() {
+            const btn = document.getElementById('btn-sync');
+            const spinner = btn.querySelector('.spinner');
+            const btnText = btn.querySelector('span');
+            
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.innerText = 'Syncing...';
+            
+            try {
+                const response = await fetch('/api/sync/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showToast(data.message, 'success');
+                    // Immediately trigger update to fetch the new employees list
+                    await updateDashboard();
+                } else {
+                    showToast(data.message || 'Sync failed.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error, please try again.', 'error');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.innerText = 'Sync Device Employees';
+            }
+        }
+
+        async function recoverToday() {
+            const btn = document.getElementById('btn-recover');
+            const text = document.getElementById('recover-text');
+            const icon = document.getElementById('recover-icon');
+            btn.disabled = true;
+            text.innerText = 'Recovering...';
+            icon.style.animation = 'spin 1s linear infinite';
+
+            try {
+                const resp = await fetch('/api/recover/', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')}
+                });
+                const data = await resp.json();
+                if (resp.ok && data.success) {
+                    showToast(data.message, 'success');
+                    if (data.saved > 0) {
+                        // Reload page to reflect all recovered punches
+                        setTimeout(() => window.location.reload(), 1500);
+                    }
+                } else {
+                    showToast(data.message || 'Device not reachable.', 'error');
+                }
+            } catch(err) {
+                showToast('Network error.', 'error');
+            } finally {
+                btn.disabled = false;
+                text.innerText = 'Recover Today';
+                icon.style.animation = '';
+            }
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Keep track of already rendered events serials
+        let renderedSerials = new Set();
+        
+        // Initialize rendered serials on load
+        document.querySelectorAll('.feed-item').forEach(item => {
+            const serial = parseInt(item.getAttribute('data-serial'));
+            if (!isNaN(serial)) renderedSerials.add(serial);
+        });
+
+        // Update dashboard elements with stats data
+        function updateStatsUI(stats) {
+            document.getElementById('stat-total').innerText = stats.total_employees;
+            document.getElementById('stat-present').innerText = stats.present_today;
+            document.getElementById('stat-absent').innerText = stats.absent_today;
+            
+            const lastPunchNameEl = document.getElementById('stat-latest-name');
+            const lastPunchTimeEl = document.getElementById('stat-latest-time');
+            
+            if (lastPunchNameEl.innerText !== stats.last_punch_name) {
+                lastPunchNameEl.innerText = stats.last_punch_name;
+                lastPunchTimeEl.innerText = stats.last_punch_time;
+                
+                const card = lastPunchNameEl.closest('.stat-card');
+                card.style.transform = 'scale(1.05)';
+                card.style.borderColor = 'var(--accent-amber)';
+                setTimeout(() => {
+                    card.style.transform = '';
+                    card.style.borderColor = '';
+                }, 500);
+            }
+        }
+
+        // Update monitor status elements
+        function updateStatusUI(status, error = null) {
+            const monitorBadge = document.getElementById('monitor-badge-container');
+            const statusText = document.getElementById('monitor-status-text');
+            const offlineBanner = document.getElementById('offline-banner');
+            
+            if (status === 'Active') {
+                monitorBadge.className = 'monitor-badge active';
+                statusText.innerText = 'MONITOR ACTIVE';
+                offlineBanner.style.display = 'none';
+            } else {
+                monitorBadge.className = 'monitor-badge offline';
+                statusText.innerText = 'MONITOR OFFLINE';
+                offlineBanner.style.display = 'flex';
+                if (error) {
+                    offlineBanner.querySelector('div').innerHTML = `
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle; margin-right:8px;">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        <strong>Monitor worker is offline:</strong> ${error}
+                    `;
+                }
+            }
+        }
+
+        // Add a new punch event item to feed
+        function appendPunchEvent(event) {
+            const feedContainer = document.getElementById('feed-container');
+            const emptyState = document.getElementById('feed-empty-state');
+            
+            if (emptyState) emptyState.remove();
+            
+            if (!renderedSerials.has(event.serial_no)) {
+                renderedSerials.add(event.serial_no);
+                
+                const item = document.createElement('div');
+                item.className = 'feed-item';
+                item.setAttribute('data-serial', event.serial_no);
+                
+                let avatarHTML = '';
+                if (event.face_url) {
+                    avatarHTML = `<img src="${event.face_url}" alt="${event.name}">`;
+                } else {
+                    avatarHTML = (event.name || "UN").substring(0, 2).toUpperCase();
+                }
+                
+                item.innerHTML = `
+                    <div class="feed-left">
+                        <div class="avatar">${avatarHTML}</div>
+                        <div class="emp-meta">
+                            <div class="emp-name">${event.name}</div>
+                            <div class="emp-details">
+                                <span>ID: ${event.employee_id}</span>
+                                <span>&bull;</span>
+                                <span class="badge-subtle">${event.user_type}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="feed-right">
+                        <div class="punch-time">${event.time}</div>
+                        <div class="punch-mode">${event.verify_mode}</div>
+                    </div>
+                `;
+                
+                feedContainer.insertBefore(item, feedContainer.firstChild);
+                
+                // Prune elements if they exceed 30 items
+                const currentItems = feedContainer.querySelectorAll('.feed-item');
+                if (currentItems.length > 30) {
+                    for (let i = 30; i < currentItems.length; i++) {
+                        const serial = parseInt(currentItems[i].getAttribute('data-serial'));
+                        renderedSerials.delete(serial);
+                        currentItems[i].remove();
+                    }
+                }
+            }
+        }
+
+        // Sound notification state and synthesis
+        let soundEnabled = false;
+
+        function playChime() {
+            if (!soundEnabled) return;
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // First tone (bell strike)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                gain1.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                
+                // Second tone (harmonic bell slightly delayed)
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.08); // A5
+                gain2.gain.setValueAtTime(0.06, audioCtx.currentTime + 0.08);
+                gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.9);
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                
+                osc1.start();
+                osc1.stop(audioCtx.currentTime + 0.8);
+                
+                setTimeout(() => {
+                    osc2.start();
+                    osc2.stop(audioCtx.currentTime + 0.9);
+                }, 80);
+            } catch (e) {
+                console.error("Audio chime playback failed:", e);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('btn-sound');
+            const text = document.getElementById('sound-text');
+            const path = document.getElementById('sound-icon-path');
+            
+            if (soundEnabled) {
+                btn.style.color = 'var(--accent-amber)';
+                btn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                btn.style.background = 'rgba(245, 158, 11, 0.05)';
+                text.innerText = 'Sound On';
+                path.setAttribute('d', 'M19.113 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z');
+                playChime();
+            } else {
+                btn.style.color = 'var(--text-secondary)';
+                btn.style.borderColor = 'var(--card-border)';
+                btn.style.background = 'rgba(255,255,255,0.03)';
+                text.innerText = 'Muted';
+                path.setAttribute('d', 'M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6L4.5 9H1.5v6h3l4.5 3.75V5.25z');
+            }
+        }
+
+        // Dynamic directory sorting (checked-in employees rise to the top)
+        function sortEmployeeList() {
+            const empContainer = document.getElementById('emp-list');
+            if (!empContainer) return;
+            const rows = Array.from(empContainer.querySelectorAll('.emp-row'));
+            
+            rows.sort((a, b) => {
+                const aPresent = a.classList.contains('present-today');
+                const bPresent = b.classList.contains('present-today');
+                
+                if (aPresent && !bPresent) return -1;
+                if (!aPresent && bPresent) return 1;
+                
+                // If both are in the same state, sort alphabetically by name attribute
+                const aName = a.getAttribute('data-name') || '';
+                const bName = b.getAttribute('data-name') || '';
+                return aName.localeCompare(bName);
+            });
+            
+            rows.forEach(row => empContainer.appendChild(row));
+        }
+
+        // Update employee row in directory
+        function updateEmployeeRow(empId, name, isPresent, lastSeenTime) {
+            const row = document.querySelector(`.emp-row[data-id="${empId}"]`);
+            if (row) {
+                const presentClass = isPresent ? 'present-today' : '';
+                const badgeClass = isPresent ? 'present' : 'absent';
+                const badgeText = isPresent ? 'Checked In' : 'Absent';
+                
+                const wasAbsent = !row.classList.contains('present-today');
+                row.className = `emp-row ${presentClass}`;
+                
+                const badge = row.querySelector('.status-badge');
+                badge.className = `status-badge ${badgeClass}`;
+                badge.innerText = badgeText;
+                
+                const lastseen = row.querySelector('.emp-row-lastseen');
+                lastseen.innerText = `Seen: ${lastSeenTime}`;
+                
+                // Flash and trigger sort if newly checked in
+                if (isPresent && wasAbsent) {
+                    row.style.transform = 'scale(1.03)';
+                    row.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                    row.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.2)';
+                    setTimeout(() => {
+                        row.style.transform = '';
+                        row.style.borderColor = '';
+                        row.style.boxShadow = '';
+                    }, 1200);
+                    sortEmployeeList();
+                }
+            }
+        }
+
+        // WebSocket Setup
+        let socket = null;
+        const reconnectInterval = 3000;
+        let pollingFallbackId = null;
+
+        function connectWebSocket() {
+            const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+            const socketUrl = wsScheme + "://" + window.location.host + "/ws/attendance/";
+            
+            console.log("Connecting to WebSocket:", socketUrl);
+            socket = new WebSocket(socketUrl);
+
+            socket.onopen = function() {
+                console.log("WebSocket connection established!");
+                if (pollingFallbackId) {
+                    clearInterval(pollingFallbackId);
+                    pollingFallbackId = null;
+                }
+            };
+
+            socket.onmessage = function(e) {
+                const message = JSON.parse(e.data);
+                
+            if (message.type === 'punch_event') {
+                const event = message.data; // payload from backend
+                // Show toast and play sound
+                showToast(`${event.name} checked in!`, 'success');
+                if (typeof playChime === 'function') playChime();
+                // Append to live feed
+                appendPunchEvent(event);
+                // Refresh stats via full dashboard update (or implement partial update later)
+                updateDashboard();
+                // Update employee row presence
+                updateEmployeeRow(event.employee_id, event.name, true, event.time);
+            } 
+                else if (message.type === 'status_update') {
+                    updateStatusUI(message.data.status, message.data.error);
+                }
+            };
+
+            socket.onclose = function(e) {
+                console.warn("WebSocket closed. Reconnecting in 3s...", e.reason);
+                startFallbackPolling();
+                setTimeout(connectWebSocket, reconnectInterval);
+            };
+
+            socket.onerror = function(err) {
+                console.error("WebSocket error:", err);
+                socket.close();
+            };
+        }
+
+        // Fallback polling
+        function startFallbackPolling() {
+            if (!pollingFallbackId) {
+                console.warn("Starting AJAX polling fallback...");
+                pollingFallbackId = setInterval(updateDashboardFallback, 5000);
+            }
+        }
+
+        async function updateDashboardFallback() {
+            try {
+                const response = await fetch('/api/events/');
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                
+                updateStatusUI(data.status);
+                updateStatsUI(data.stats);
+                
+                if (data.events && data.events.length > 0) {
+                    [...data.events].reverse().forEach(event => {
+                        appendPunchEvent(event);
+                    });
+                }
+                
+                if (data.employees && data.employees.length > 0) {
+                    data.employees.forEach(emp => {
+                        updateEmployeeRow(emp.employee_id, emp.name, emp.is_present_today, emp.last_punch);
+                    });
+                    sortEmployeeList();
+                }
+            } catch (err) {
+                console.error("Failed fallback polling:", err);
+            }
+        }
+
+        // Start WS and initial list sorting on load
+        connectWebSocket();
+        sortEmployeeList();
+    </script>
+</body>
+</html>

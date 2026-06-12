@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    command: daphne -b 0.0.0.0 -p 8000 attendance_system.asgi:application
+    ports:
+      - "192.168.0.176:80:8000"
+    volumes:
+      - /home/athish/Documents/Natdemy/Attendance:/app
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379/0
+
+  monitor:
+    build: .
+    command: python manage.py monitor_device
+    volumes:
+      - /home/athish/Documents/Natdemy/Attendance:/app
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379/0
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"

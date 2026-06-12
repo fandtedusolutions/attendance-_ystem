@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Demo ERP Server</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 40px;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        h1 {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 15px;
+            margin-top: 0;
+            color: #111827;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background-color: #f9fafb;
+            color: #374151;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f9fafb;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background-color: #e0f2fe;
+            color: #0369a1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Demo ERP Received Webhooks Log</h1>
+        <p>This page shows the live attendance logs successfully forwarded to this ERP from the Hikvision monitoring server.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Serial No</th>
+                    <th>Employee Name</th>
+                    <th>Biometric ID</th>
+                    <th>Timestamp (IST)</th>
+                    <th>Verify Mode</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td><strong>#{{ log.serial_no }}</strong></td>
+                    <td>{{ log.employee.name }}</td>
+                    <td><code>{{ log.employee.biometric_id }}</code></td>
+                    <td>{{ log.timestamp|date:"d M Y, h:i:s A" }}</td>
+                    <td><span class="badge">{{ log.verify_mode }}</span></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #6b7280; padding: 30px;">
+                        No webhook payloads received yet. Trigger a punch or click "Recover Today" to start forwarding.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
