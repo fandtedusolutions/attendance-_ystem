@@ -1,0 +1,55 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+*.mo
+*.pyc
+
+# Virtual environments
+env/
+.venv/
+venv*/
+
+# Environment variables
+.env
+*.env
+
+# Django secret key / settings overrides
+local_settings.py
+
+# Docker artifacts
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+.dockerignore
+
+# IDE / editor files
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+# Static files collected by Django (if you run collectstatic locally)
+staticfiles/
+
+# Media uploads (if stored locally)
+media/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Test artifacts
+__pypackages__/
+
+# Project specific logs
+logs/
