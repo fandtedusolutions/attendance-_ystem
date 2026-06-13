@@ -11,4 +11,5 @@ urlpatterns = [
     path('api/sync/', views.api_sync_users, name='api_sync_users'),
     path('api/recover/', views.api_recover_today, name='api_recover_today'),
     path('api/broadcast/', views.api_broadcast, name='api_broadcast'),
+    path('api/export/', views.export_attendance, name='api_export'),
 ]

@@ -51,6 +51,15 @@ docker compose ps
 ```
 You should see `web`, `monitor`, `redis` (and optionally a database) listed as **Up**.
 
+# Monitor container logs
+```bash
+# Follow the web container logs
+docker compose logs -f web
+
+# In another terminal, you can also watch the monitor logs
+docker compose logs -f monitor
+```
+
 ### 5. Access the dashboard
 Open a browser and navigate to:
 ```

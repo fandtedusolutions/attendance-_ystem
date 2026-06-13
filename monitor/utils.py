@@ -19,7 +19,8 @@ def get_device_session():
             connect=3,
             read=3,
             backoff_factor=0.5,
-            status_forcelist=[500, 502, 503, 504]
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"]
         )
         adapter = HTTPAdapter(max_retries=retries, pool_connections=5, pool_maxsize=10)
         _session.mount("https://", adapter)

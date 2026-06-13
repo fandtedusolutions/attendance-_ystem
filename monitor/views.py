@@ -398,3 +398,106 @@ def api_day_report(request):
         "total_absent": total_absent,
         "data": report_data
     })
+
+import csv
+from django.http import HttpResponse
+
+def export_attendance(request):
+    period = request.GET.get('period', 'day')
+    emp_id = request.GET.get('employee_id', None)
+    date_str = request.GET.get('date', None)
+    
+    tz = timezone.get_current_timezone()
+    today_local = timezone.localtime(timezone.now()).date()
+    
+    if date_str:
+        try:
+            ref_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            ref_date = today_local
+    else:
+        ref_date = today_local
+        
+    if period == 'week':
+        start_date = ref_date - datetime.timedelta(days=ref_date.weekday())
+        end_date = start_date + datetime.timedelta(days=6)
+    elif period == 'month':
+        start_date = ref_date.replace(day=1)
+        next_month = start_date.replace(day=28) + datetime.timedelta(days=4)
+        end_date = next_month - datetime.timedelta(days=next_month.day)
+    else: # day
+        start_date = ref_date
+        end_date = ref_date
+        
+    start_time = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min), tz)
+    end_time = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max), tz)
+    
+    punches = PunchEvent.objects.filter(time__gte=start_time, time__lte=end_time).order_by('time')
+    
+    from django.db.models import Q
+    if emp_id:
+        # emp_id is acting as a search term for name or ID
+        punches = punches.filter(Q(employee_id_str__icontains=emp_id) | Q(name__icontains=emp_id))
+        
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for p in punches:
+        p_date = timezone.localtime(p.time).date()
+        grouped[(p_date, p.employee_id_str)].append(p)
+        
+    response = HttpResponse(content_type='text/csv')
+    filename = f"attendance_{period}_{start_date.strftime('%Y%m%d')}"
+    if emp_id:
+        filename += f"_filtered"
+    response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Employee ID', 'Name', 'Check In', 'Check Out', 'Working Hours', 'Status'])
+    
+    late_limit = datetime.time(9, 0, 0)
+    early_limit = datetime.time(18, 0, 0)
+    
+    employees = Employee.objects.all().order_by('name')
+    if emp_id:
+        employees = employees.filter(Q(employee_id__icontains=emp_id) | Q(name__icontains=emp_id))
+        
+    emp_dict = {str(e.employee_id): e.name for e in employees}
+    
+    current_date = start_date
+    while current_date <= end_date:
+        for eid, name in emp_dict.items():
+            daily_punches = grouped.get((current_date, eid), [])
+            if not daily_punches:
+                writer.writerow([current_date.strftime('%Y-%m-%d'), eid, name, '-', '-', '-', 'Absent'])
+                continue
+                
+            first = daily_punches[0]
+            last = daily_punches[-1]
+            
+            in_local = timezone.localtime(first.time)
+            out_local = timezone.localtime(last.time)
+            
+            in_str = in_local.strftime('%I:%M:%S %p')
+            
+            if len(daily_punches) == 1:
+                out_str = "-"
+                duration_str = "-"
+                status = "Single Punch"
+            else:
+                out_str = out_local.strftime('%I:%M:%S %p')
+                duration = last.time - first.time
+                hours, remainder = divmod(duration.total_seconds(), 3600)
+                minutes, _ = divmod(remainder, 60)
+                duration_str = f"{int(hours)}h {int(minutes)}m"
+                status = "Present"
+                
+            if in_local.time() > late_limit:
+                status += " (Late)"
+            if out_str != "-" and out_local.time() < early_limit:
+                status += " (Early Exit)"
+                
+            writer.writerow([current_date.strftime('%Y-%m-%d'), eid, name, in_str, out_str, duration_str, status])
+            
+        current_date += datetime.timedelta(days=1)
+        
+    return response

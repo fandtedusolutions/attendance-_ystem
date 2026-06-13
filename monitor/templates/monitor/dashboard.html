@@ -994,8 +994,10 @@
                 
                 if (response.ok && data.success) {
                     showToast(data.message, 'success');
-                    // Immediately trigger update to fetch the new employees list
-                    await updateDashboard();
+                    // Reload page to reflect newly created employees in the HTML template
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
                     showToast(data.message || 'Sync failed.', 'error');
                 }
@@ -1339,11 +1341,11 @@
         function startFallbackPolling() {
             if (!pollingFallbackId) {
                 console.warn("Starting AJAX polling fallback...");
-                pollingFallbackId = setInterval(updateDashboardFallback, 5000);
+                pollingFallbackId = setInterval(updateDashboard, 5000);
             }
         }
 
-        async function updateDashboardFallback() {
+        async function updateDashboard() {
             try {
                 const response = await fetch('/api/events/');
                 if (!response.ok) return;
