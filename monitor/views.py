@@ -151,10 +151,22 @@ def api_recover_today(request):
         session = get_device_session()
         r = session.post(url, json=payload, timeout=8)
         r.raise_for_status()
-        total = r.json()["AcsEvent"]["totalMatches"]
+        if not r.text.strip():
+            total = 0
+        else:
+            total = r.json().get("AcsEvent", {}).get("totalMatches", 0)
     except Exception as e:
-        reset_device_session()
-        return JsonResponse({"success": False, "message": f"Cannot reach device: {e}"}, status=503)
+        try:
+            fallback_url = f"{url}&searchResultPosition=0&maxResults=1"
+            r = session.get(fallback_url, timeout=8)
+            r.raise_for_status()
+            if not r.text.strip():
+                total = 0
+            else:
+                total = r.json().get("AcsEvent", {}).get("totalMatches", 0)
+        except Exception as e2:
+            reset_device_session()
+            return JsonResponse({"success": False, "message": f"Cannot reach device: POST failed ({e}), GET failed ({e2})"}, status=503)
 
     # Back-scan from end to collect missed events
     page_size = 30
@@ -168,10 +180,22 @@ def api_recover_today(request):
             payload = {"AcsEventCond": {"searchID": "1", "searchResultPosition": scan_pos, "maxResults": page_size, "major": 5, "minor": 38}}
             r = session.post(url, json=payload, timeout=10)
             r.raise_for_status()
-            page_events = r.json().get("AcsEvent", {}).get("InfoList", [])
+            if not r.text.strip():
+                page_events = []
+            else:
+                page_events = r.json().get("AcsEvent", {}).get("InfoList", [])
         except Exception as e:
-            reset_device_session()
-            break
+            try:
+                fallback_url = f"{url}&searchResultPosition={scan_pos}&maxResults={page_size}"
+                r = session.get(fallback_url, timeout=10)
+                r.raise_for_status()
+                if not r.text.strip():
+                    page_events = []
+                else:
+                    page_events = r.json().get("AcsEvent", {}).get("InfoList", [])
+            except Exception as e2:
+                reset_device_session()
+                break
 
         if not page_events:
             break
@@ -362,7 +386,8 @@ def api_day_report(request):
                 punches_list.append({
                     "time": p_local.strftime('%I:%M:%S %p'),
                     "verify_mode": p_ev.verify_mode or "Card/Face",
-                    "serial_no": p_ev.serial_no
+                    "serial_no": p_ev.serial_no,
+                    "shared_to_erp": p_ev.shared_to_erp,
                 })
             
             report_data.append({
@@ -501,3 +526,109 @@ def export_attendance(request):
         current_date += datetime.timedelta(days=1)
         
     return response
+
+
+@require_POST
+def api_resend_webhook(request):
+    """
+    Resends punch events for a specific date to the ERP webhook.
+    Can resend all or only unsent ones.
+    """
+    import concurrent.futures
+    import requests
+
+    webhook_url = getattr(settings, 'ERP_WEBHOOK_URL', None)
+    if not webhook_url:
+        return JsonResponse({"success": False, "message": "ERP Webhook URL is not configured in settings/.env."}, status=400)
+
+    try:
+        if request.content_type == 'application/json':
+            body = json.loads(request.body)
+            date_str = body.get('date')
+            resend_all = body.get('resend_all', False)
+        else:
+            date_str = request.POST.get('date')
+            resend_all = request.POST.get('resend_all') == 'true'
+    except Exception:
+        date_str = None
+        resend_all = False
+
+    if not date_str:
+        date_str = timezone.localtime(timezone.now()).strftime('%Y-%m-%d')
+
+    try:
+        target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({"success": False, "message": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
+    tz = timezone.get_current_timezone()
+    start_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time.min), tz)
+    end_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time.max), tz)
+
+    punches = PunchEvent.objects.filter(time__gte=start_time, time__lte=end_time)
+    if not resend_all:
+        punches = punches.filter(shared_to_erp=False)
+
+    punches = punches.order_by('time')
+    total_to_send = punches.count()
+
+    if total_to_send == 0:
+        return JsonResponse({
+            "success": True,
+            "message": f"No {'unsent ' if not resend_all else ''}punch events found for {date_str}.",
+            "sent": 0,
+            "failed": 0
+        })
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Natdemy-Attendance-System/1.0"
+    }
+    token = getattr(settings, 'ERP_WEBHOOK_TOKEN', None)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    def send_single_punch(punch):
+        payload = {
+            "serial_no": punch.serial_no,
+            "employee_id": punch.employee_id_str,
+            "name": punch.name or (punch.employee.name if punch.employee else "Unknown"),
+            "time": punch.time.isoformat(),
+            "verify_mode": punch.verify_mode or "Unknown",
+        }
+        try:
+            r = requests.post(webhook_url, json=payload, headers=headers, timeout=5)
+            if 200 <= r.status_code < 300:
+                punch.shared_to_erp = True
+                punch.save(update_fields=['shared_to_erp'])
+                return True, punch.serial_no, None
+            else:
+                return False, punch.serial_no, f"HTTP {r.status_code}"
+        except Exception as e:
+            return False, punch.serial_no, str(e)
+
+    success_count = 0
+    fail_count = 0
+    errors = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        results = executor.map(send_single_punch, punches)
+        for success, serial, err in results:
+            if success:
+                success_count += 1
+            else:
+                fail_count += 1
+                errors.append(f"Serial {serial}: {err}")
+
+    msg = f"Sent {success_count} punch(es) successfully for {date_str}."
+    if fail_count > 0:
+        msg += f" Failed to send {fail_count} punch(es)."
+
+    return JsonResponse({
+        "success": fail_count == 0,
+        "message": msg,
+        "sent": success_count,
+        "failed": fail_count,
+        "errors": errors[:10]
+    })
+

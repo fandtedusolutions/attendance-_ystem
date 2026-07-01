@@ -717,6 +717,13 @@
                     <span id="recover-text">Recover Today</span>
                 </button>
                 
+                <button id="btn-resend-webhook" class="btn" onclick="resendTodayWebhooks()" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.3); color: #a5b4fc;" title="Resend today's unsent punches to ERP webhook">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" id="resend-icon">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path>
+                    </svg>
+                    <span id="resend-text">Resend Webhooks</span>
+                </button>
+
                 <button id="btn-sync" class="btn btn-primary" onclick="syncEmployees()">
                     <svg class="spinner" style="display: none;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-dasharray="32" stroke-linecap="round"></circle>
@@ -994,10 +1001,7 @@
                 
                 if (response.ok && data.success) {
                     showToast(data.message, 'success');
-                    // Reload page to reflect newly created employees in the HTML template
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
+                    setTimeout(updateDashboard, 1000);
                 } else {
                     showToast(data.message || 'Sync failed.', 'error');
                 }
@@ -1028,8 +1032,7 @@
                 if (resp.ok && data.success) {
                     showToast(data.message, 'success');
                     if (data.saved > 0) {
-                        // Reload page to reflect all recovered punches
-                        setTimeout(() => window.location.reload(), 1500);
+                        setTimeout(updateDashboard, 1000);
                     }
                 } else {
                     showToast(data.message || 'Device not reachable.', 'error');
@@ -1039,6 +1042,41 @@
             } finally {
                 btn.disabled = false;
                 text.innerText = 'Recover Today';
+                icon.style.animation = '';
+        }
+
+        async function resendTodayWebhooks() {
+            const btn = document.getElementById('btn-resend-webhook');
+            const text = document.getElementById('resend-text');
+            const icon = document.getElementById('resend-icon');
+            btn.disabled = true;
+            text.innerText = 'Sending...';
+            icon.style.animation = 'spin 1s linear infinite';
+
+            try {
+                const resendAll = confirm("Do you want to resend ALL punches for today?\n\n(Click OK to resend ALL punches.\nClick Cancel to resend ONLY failed/pending punches.)");
+                
+                const resp = await fetch('/api/webhook/resend/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        resend_all: resendAll
+                    })
+                });
+                const data = await resp.json();
+                if (resp.ok && data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message || 'Resend failed.', 'error');
+                }
+            } catch(err) {
+                showToast('Network error.', 'error');
+            } finally {
+                btn.disabled = false;
+                text.innerText = 'Resend Webhooks';
                 icon.style.animation = '';
             }
         }
@@ -1169,7 +1207,7 @@
         }
 
         // Sound notification state and synthesis
-        let soundEnabled = false;
+        let soundEnabled = true;
 
         function playChime() {
             if (!soundEnabled) return;
@@ -1253,9 +1291,44 @@
         }
 
         // Update employee row in directory
-        function updateEmployeeRow(empId, name, isPresent, lastSeenTime) {
-            const row = document.querySelector(`.emp-row[data-id="${empId}"]`);
-            if (row) {
+        function updateEmployeeRow(empId, name, isPresent, lastSeenTime, faceUrl = null, numFp = 0, numFace = 0) {
+            let row = document.querySelector(`.emp-row[data-id="${empId}"]`);
+            if (!row) {
+                const empContainer = document.getElementById('emp-list');
+                if (!empContainer) return;
+                
+                const emptyState = empContainer.querySelector('.empty-state');
+                if (emptyState) emptyState.remove();
+
+                row = document.createElement('div');
+                row.className = `emp-row ${isPresent ? 'present-today' : ''}`;
+                row.setAttribute('data-id', empId);
+                row.setAttribute('data-name', name.toLowerCase());
+                
+                let avatarHTML = '';
+                if (faceUrl) {
+                    avatarHTML = `<img src="${faceUrl}" alt="${name}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                } else {
+                    avatarHTML = name.slice(0, 2).toUpperCase();
+                }
+
+                row.innerHTML = `
+                    <div class="emp-row-left">
+                        <div class="emp-row-avatar">${avatarHTML}</div>
+                        <div class="emp-row-info">
+                            <div class="emp-row-name">${name}</div>
+                            <div class="emp-row-sub">ID: ${empId} &bull; FP: ${numFp} &bull; Face: ${numFace}</div>
+                        </div>
+                    </div>
+                    <div class="emp-row-right">
+                        <span class="status-badge ${isPresent ? 'present' : 'absent'}">
+                            ${isPresent ? 'Checked In' : 'Absent'}
+                        </span>
+                        <div class="emp-row-lastseen">Seen: ${lastSeenTime || '-'}</div>
+                    </div>
+                `;
+                empContainer.appendChild(row);
+            } else {
                 const presentClass = isPresent ? 'present-today' : '';
                 const badgeClass = isPresent ? 'present' : 'absent';
                 const badgeText = isPresent ? 'Checked In' : 'Absent';
@@ -1268,7 +1341,7 @@
                 badge.innerText = badgeText;
                 
                 const lastseen = row.querySelector('.emp-row-lastseen');
-                lastseen.innerText = `Seen: ${lastSeenTime}`;
+                lastseen.innerText = `Seen: ${lastSeenTime || '-'}`;
                 
                 // Flash and trigger sort if newly checked in
                 if (isPresent && wasAbsent) {
@@ -1363,7 +1436,15 @@
                 
                 if (data.employees && data.employees.length > 0) {
                     data.employees.forEach(emp => {
-                        updateEmployeeRow(emp.employee_id, emp.name, emp.is_present_today, emp.last_punch);
+                        updateEmployeeRow(
+                            emp.employee_id,
+                            emp.name,
+                            emp.is_present_today,
+                            emp.last_punch,
+                            emp.face_url,
+                            emp.num_fp,
+                            emp.num_face
+                        );
                     });
                     sortEmployeeList();
                 }
@@ -1374,6 +1455,21 @@
 
         // Start WS and initial list sorting on load
         connectWebSocket();
+        
+        // Initialize sound UI based on default setting
+        if (soundEnabled) {
+            const btn = document.getElementById('btn-sound');
+            const text = document.getElementById('sound-text');
+            const path = document.getElementById('sound-icon-path');
+            btn.style.color = 'var(--accent-amber)';
+            btn.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+            btn.style.background = 'rgba(245, 158, 11, 0.05)';
+            text.innerText = 'Sound On';
+            path.setAttribute('d', 'M19.113 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z');
+        }
+
+        // Load initial attendance data
+        updateDashboard();
         sortEmployeeList();
     </script>
 </body>

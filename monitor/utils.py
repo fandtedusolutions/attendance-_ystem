@@ -14,6 +14,8 @@ def get_device_session():
     global _session
     if _session is None:
         _session = requests.Session()
+        # Ensure we request JSON format from the device
+        _session.headers.update({"Accept": "application/json", "Content-Type": "application/json"})
         retries = Retry(
             total=3,
             connect=3,

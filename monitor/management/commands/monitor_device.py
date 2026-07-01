@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         ip = settings.HIKVISION_IP
-        protocol = getattr(settings, 'HIKVISION_PROTOCOL', 'https')
+        protocol = getattr(settings, 'HIKVISION_PROTOCOL', 'http')
         self.stdout.write(self.style.SUCCESS(f"Starting Hikvision Monitor for IP: {ip} ({protocol})"))
 
         attendance_url = f"{protocol}://{ip}/ISAPI/AccessControl/AcsEvent?format=json"
@@ -235,29 +235,79 @@ class Command(BaseCommand):
                 time.sleep(5)
 
     def get_total_matches(self, url):
+        """Fetch total number of matches using a POST request as required by Hikvision API.
+        Returns 0 on any error or empty response.
+        """
         payload = {
             "AcsEventCond": {
                 "searchID": "1",
                 "searchResultPosition": 0,
                 "maxResults": 1,
                 "major": 5,
-                "minor": 38
+                "minor": 38,
             }
         }
         session = get_device_session()
-        r = session.post(url, json=payload, timeout=10)
-        return r.json()["AcsEvent"]["totalMatches"]
+        try:
+            r = session.post(url, json=payload, timeout=15)
+            logger.debug(f"POST total matches {url} status {r.status_code}")
+            r.raise_for_status()
+            if not r.text.strip():
+                logger.warning(f"Empty response for total matches from {url}")
+                return 0
+            data = r.json()
+            return data.get("AcsEvent", {}).get("totalMatches", 0)
+        except Exception as e:
+            logger.warning(f"POST total matches failed ({e}), attempting GET fallback")
+            fallback_url = f"{url}&searchResultPosition=0&maxResults=1"
+            try:
+                r = session.get(fallback_url, timeout=15)
+                logger.debug(f"GET fallback total matches {fallback_url} status {r.status_code}")
+                r.raise_for_status()
+                if not r.text.strip():
+                    logger.warning(f"Empty response for total matches from {fallback_url}")
+                    return 0
+                data = r.json()
+                return data.get("AcsEvent", {}).get("totalMatches", 0)
+            except Exception as e2:
+                logger.error(f"Failed to get total matches via both POST and GET: {e2}")
+                return 0
 
     def get_events(self, url, position, max_results):
+        """Retrieve a page of events using a POST request as required by Hikvision API.
+        Returns an empty dict on error.
+        """
         payload = {
             "AcsEventCond": {
                 "searchID": "1",
                 "searchResultPosition": position,
                 "maxResults": max_results,
                 "major": 5,
-                "minor": 38
+                "minor": 38,
             }
         }
         session = get_device_session()
-        r = session.post(url, json=payload, timeout=10)
-        return r.json()
+        try:
+            r = session.post(url, json=payload, timeout=15)
+            logger.debug(f"POST events {url} position {position} max {max_results} status {r.status_code}")
+            r.raise_for_status()
+            if not r.text.strip():
+                logger.warning(f"Empty response for events from {url} at position {position}")
+                return {}
+            return r.json()
+        except Exception as e:
+            logger.warning(f"POST events failed ({e}), attempting GET fallback")
+            fallback_url = f"{url}&searchResultPosition={position}&maxResults={max_results}"
+            try:
+                r = session.get(fallback_url, timeout=15)
+                logger.debug(f"GET fallback events {fallback_url} status {r.status_code}")
+                r.raise_for_status()
+                if not r.text.strip():
+                    logger.warning(f"Empty response for events from {fallback_url}")
+                    return {}
+                return r.json()
+            except Exception as e2:
+                logger.error(f"Failed to get events via both POST and GET: {e2}")
+                return {}
+
+

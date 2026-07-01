@@ -79,10 +79,7 @@ ASGI_APPLICATION = 'attendance_system.asgi.application'
 
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("redis", 6379)],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
 
@@ -136,7 +133,8 @@ STATIC_URL = 'static/'
 
 # Hikvision Access Control settings
 HIKVISION_IP = os.getenv("HIKVISION_IP", "192.168.0.125")
-HIKVISION_PROTOCOL = os.getenv("HIKVISION_PROTOCOL", "http")
+# Default to HTTPS for secure communication; can be overridden via env var
+HIKVISION_PROTOCOL = os.getenv("HIKVISION_PROTOCOL", "https")
 HIKVISION_USERNAME = os.getenv("HIKVISION_USERNAME", "admin")
 HIKVISION_PASSWORD = os.getenv("HIKVISION_PASSWORD", "Nisa@408")
 

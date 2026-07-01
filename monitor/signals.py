@@ -9,11 +9,14 @@ import logging
 
 logger = logging.getLogger('monitor')
 
-def send_webhook_async(url, payload, headers):
+def send_webhook_async(url, payload, headers, punch_event_id):
     try:
         # Use reasonable timeouts (5s connect, 10s read) so we do not block threads forever
         response = requests.post(url, json=payload, headers=headers, timeout=(5, 10))
         logger.info(f"[ERP Webhook] Status: {response.status_code} for serial {payload.get('serial_no')}")
+        if 200 <= response.status_code < 300:
+            from monitor.models import PunchEvent
+            PunchEvent.objects.filter(id=punch_event_id).update(shared_to_erp=True)
     except Exception as e:
         logger.error(f"[ERP Webhook] Error sending webhook: {e}")
 
@@ -55,7 +58,7 @@ def handle_new_punch(sender, instance, created, **kwargs):
     # Dispatch to background thread so it does not block the database save operation or monitor loop
     thread = threading.Thread(
         target=send_webhook_async,
-        args=(webhook_url, payload, headers),
+        args=(webhook_url, payload, headers, instance.id),
         daemon=True
     )
     thread.start()

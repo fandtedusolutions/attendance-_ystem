@@ -3,7 +3,7 @@ services:
     build: .
     command: daphne -b 0.0.0.0 -p 8000 attendance_system.asgi:application
     ports:
-      - "192.168.0.176:80:8000"
+      - "80:8000"
     volumes:
       - /home/athish/Documents/Natdemy/Attendance:/app
     restart: always

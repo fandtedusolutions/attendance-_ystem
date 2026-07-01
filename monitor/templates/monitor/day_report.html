@@ -615,10 +615,36 @@
             transition: var(--transition-smooth);
         }
         
-        .btn-toggle-details.active svg {
-            transform: rotate(180deg);
-            color: var(--accent-primary);
+        
+        /* Toast Message */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #181920;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: var(--transition-smooth);
+            z-index: 1000;
+            font-weight: 500;
+            font-size: 0.85rem;
         }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success { border-color: var(--accent-green); }
+        .toast.error { border-color: var(--accent-rose); }
     </style>
 </head>
 <body>
@@ -688,6 +714,12 @@
                             <option value="week" style="background: var(--bg-color); color: var(--text-primary);">Week CSV</option>
                             <option value="month" style="background: var(--bg-color); color: var(--text-primary);">Month CSV</option>
                         </select>
+                        <button onclick="resendWebhook()" class="btn" id="btn-resend-webhook" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05)); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 10px; white-space: nowrap; font-weight: 700; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);" title="Resend punches to the ERP webhook for this day">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" id="resend-icon">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path>
+                            </svg>
+                            <span id="resend-text">Resend Webhook</span>
+                        </button>
                         <button onclick="exportData()" class="btn" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05)); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-green); padding: 8px 16px; border-radius: 10px; white-space: nowrap; font-weight: 700; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);">
                             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
@@ -1094,6 +1126,9 @@
                                     <div class="timeline-meta">
                                         <span>Mode: ${getVerifyModeLabel(p.verify_mode)}</span>
                                         <span>Serial: ${p.serial_no}</span>
+                                        <span style="color: ${p.shared_to_erp ? 'var(--accent-green)' : 'var(--accent-rose)'}; background: ${p.shared_to_erp ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)'}; border: 1px solid ${p.shared_to_erp ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)'}; padding: 1px 6px; border-radius: 4px; font-weight: 600;">
+                                            ${p.shared_to_erp ? '✓ Sent' : '✗ Pending'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -1130,6 +1165,83 @@
                 url += `&employee_id=${encodeURIComponent(searchInput)}`;
             }
             window.location.href = url;
+        }
+
+        async function resendWebhook() {
+            const btn = document.getElementById('btn-resend-webhook');
+            const text = document.getElementById('resend-text');
+            const icon = document.getElementById('resend-icon');
+            
+            btn.disabled = true;
+            text.innerText = 'Sending...';
+            icon.style.animation = 'spin 1s linear infinite';
+            
+            const dateStr = formatISO(selectedDate);
+            
+            try {
+                const resendAll = confirm("Do you want to resend ALL punches for this day?\n\n(Click OK to resend ALL punches.\nClick Cancel to resend ONLY failed/pending punches.)");
+                
+                const response = await fetch('/api/webhook/resend/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        date: dateStr,
+                        resend_all: resendAll
+                    })
+                });
+                
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    showToast(data.message, 'success');
+                    setTimeout(() => fetchAttendanceReport(selectedDate), 1000);
+                } else {
+                    showToast(data.message || 'Resend failed.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error, please try again.', 'error');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                text.innerText = 'Resend Webhook';
+                icon.style.animation = '';
+            }
+        }
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function showToast(message, type = 'success') {
+            document.querySelectorAll('.toast').forEach(t => t.remove());
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span class="status-dot" style="background-color: ${type === 'success' ? 'var(--accent-green)' : 'var(--accent-rose)'}; width: 8px; height: 8px; border-radius: 50%;"></span>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 50);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
 
         // Initialize Page

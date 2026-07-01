@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/recover/', views.api_recover_today, name='api_recover_today'),
     path('api/broadcast/', views.api_broadcast, name='api_broadcast'),
     path('api/export/', views.export_attendance, name='api_export'),
+    path('api/webhook/resend/', views.api_resend_webhook, name='api_resend_webhook'),
 ]
