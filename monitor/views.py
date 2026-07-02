@@ -611,7 +611,7 @@ def api_resend_webhook(request):
     fail_count = 0
     errors = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(send_single_punch, punches)
         for success, serial, err in results:
             if success:
