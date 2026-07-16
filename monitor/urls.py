@@ -13,4 +13,7 @@ urlpatterns = [
     path('api/broadcast/', views.api_broadcast, name='api_broadcast'),
     path('api/export/', views.export_attendance, name='api_export'),
     path('api/webhook/resend/', views.api_resend_webhook, name='api_resend_webhook'),
+    path('api/webhook/mode/', views.api_webhook_mode, name='api_webhook_mode'),
+    path('api/webhook/pending/', views.api_webhook_pending, name='api_webhook_pending'),
+    path('api/webhook/send-single/', views.api_send_single_punch, name='api_send_single_punch'),
 ]

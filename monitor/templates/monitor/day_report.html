@@ -1179,7 +1179,17 @@
             const dateStr = formatISO(selectedDate);
             
             try {
-                const resendAll = confirm("Do you want to resend ALL punches for this day?\n\n(Click OK to resend ALL punches.\nClick Cancel to resend ONLY failed/pending punches.)");
+                const resendScope = prompt("Type 'day' to process this specific day.\nType 'all' to process ALL days in the database.", "day");
+                if (resendScope === null) {
+                    btn.disabled = false;
+                    text.innerText = 'Resend Webhook';
+                    icon.style.animation = '';
+                    return;
+                }
+                const isAllDays = resendScope.trim().toLowerCase() === 'all';
+                const finalDateStr = isAllDays ? "all" : dateStr;
+
+                const resendAll = confirm(`Do you want to resend ALL punches ${isAllDays ? 'across all days' : 'for this day'}?\n\n(Click OK to resend ALL punches.\nClick Cancel to resend ONLY failed/pending punches.)`);
                 
                 const response = await fetch('/api/webhook/resend/', {
                     method: 'POST',
@@ -1188,7 +1198,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        date: dateStr,
+                        date: finalDateStr,
                         resend_all: resendAll
                     })
                 });

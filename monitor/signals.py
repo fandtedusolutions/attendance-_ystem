@@ -55,13 +55,20 @@ def handle_new_punch(sender, instance, created, **kwargs):
         "verify_mode": instance.verify_mode or "Unknown",
     }
 
-    # Dispatch to background thread so it does not block the database save operation or monitor loop
-    thread = threading.Thread(
-        target=send_webhook_async,
-        args=(webhook_url, payload, headers, instance.id),
-        daemon=True
-    )
-    thread.start()
+    from monitor.models import SystemStatus
+    status_obj = SystemStatus.objects.filter(key='webhook_send_mode').first()
+    mode = status_obj.value if status_obj else 'auto'
+
+    if mode == 'manual':
+        logger.info(f"[ERP Webhook] Manual send mode active: event serial {instance.serial_no} saved as Pending.")
+    else:
+        # Dispatch to background thread so it does not block the database save operation or monitor loop
+        thread = threading.Thread(
+            target=send_webhook_async,
+            args=(webhook_url, payload, headers, instance.id),
+            daemon=True
+        )
+        thread.start()
 
     # Broadcast to WebSocket consumers via Redis channel layer
     channel_layer = get_channel_layer()

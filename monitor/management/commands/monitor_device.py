@@ -12,7 +12,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from monitor.models import Employee, PunchEvent, SystemStatus
-from monitor.utils import sync_employees_from_device, get_device_session, reset_device_session
+from monitor.utils import sync_employees_from_device, get_device_session, reset_device_session, get_device_ip, rediscover_device_ip
 
 urllib3.disable_warnings()
 
@@ -33,11 +33,16 @@ class Command(BaseCommand):
     help = "Monitors Hikvision Access Control device for live punch events"
 
     def handle(self, *args, **options):
-        ip = settings.HIKVISION_IP
         protocol = getattr(settings, 'HIKVISION_PROTOCOL', 'http')
+        ip = get_device_ip()
         self.stdout.write(self.style.SUCCESS(f"Starting Hikvision Monitor for IP: {ip} ({protocol})"))
 
-        attendance_url = f"{protocol}://{ip}/ISAPI/AccessControl/AcsEvent?format=json"
+        consecutive_errors = 0  # Track consecutive errors for auto-discovery
+
+        def build_attendance_url():
+            return f"{protocol}://{get_device_ip()}/ISAPI/AccessControl/AcsEvent?format=json"
+
+        attendance_url = build_attendance_url()
 
         # 1. Sync users from device to DB on start
         try:
@@ -58,9 +63,10 @@ class Command(BaseCommand):
         else:
             # Fresh DB — start from the last 30 events on the device
             try:
-                total = self.get_total_matches(attendance_url)
+                init_search_id = str(int(time.time()))
+                total = self.get_total_matches(attendance_url, init_search_id)
                 start_position = max(0, total - 30)
-                data = self.get_events(attendance_url, start_position, 30)
+                data = self.get_events(attendance_url, start_position, 30, init_search_id)
                 events = data.get("AcsEvent", {}).get("InfoList", [])
                 last_serial = max((e["serialNo"] for e in events), default=0)
             except Exception as e:
@@ -84,7 +90,11 @@ class Command(BaseCommand):
                 # Broadcast active status to connected browser clients
                 broadcast_ws("monitor_status_change", {"status": "Active", "error": None})
 
-                total = self.get_total_matches(attendance_url)
+                # Rebuild the URL each iteration in case the IP was re-discovered
+                attendance_url = build_attendance_url()
+
+                search_id = str(int(time.time()))
+                total = self.get_total_matches(attendance_url, search_id)
 
                 # Smart back-scan: start from the END of the device log and page
                 # backwards until we find events we've already saved (serial <= last_serial).
@@ -95,7 +105,7 @@ class Command(BaseCommand):
                 found_boundary = False
 
                 while not found_boundary:
-                    page_data = self.get_events(attendance_url, scan_position, page_size)
+                    page_data = self.get_events(attendance_url, scan_position, page_size, search_id)
                     page_events = page_data.get("AcsEvent", {}).get("InfoList", [])
 
                     if not page_events:
@@ -214,13 +224,15 @@ class Command(BaseCommand):
 
                 # Clear previous monitor error if successful
                 SystemStatus.objects.filter(key="monitor_error").delete()
+                consecutive_errors = 0  # Reset error counter on success
 
                 time.sleep(5)
 
             except Exception as e:
                 err_str = str(e)
-                self.stdout.write(self.style.ERROR(f"Error in monitor loop: {err_str}"))
-                logger.error(f"Error in monitor loop: {err_str}", exc_info=True)
+                consecutive_errors += 1
+                self.stdout.write(self.style.ERROR(f"Error in monitor loop (attempt {consecutive_errors}): {err_str}"))
+                logger.error(f"Error in monitor loop (attempt {consecutive_errors}): {err_str}", exc_info=True)
                 SystemStatus.objects.update_or_create(
                     key="monitor_error",
                     defaults={"value": err_str}
@@ -229,18 +241,44 @@ class Command(BaseCommand):
                 # Reset the HTTP session so the next attempt creates a fresh connection
                 reset_device_session()
 
+                # After 3 consecutive errors, the device IP may have changed — auto-discover
+                if consecutive_errors >= 3:
+                    old_ip = get_device_ip()
+                    self.stdout.write(self.style.WARNING(
+                        f"Device unreachable at {old_ip} after {consecutive_errors} attempts. "
+                        f"Scanning network for device..."
+                    ))
+                    logger.warning(f"Device unreachable at {old_ip}, triggering auto-discovery...")
+                    new_ip = rediscover_device_ip()
+                    if new_ip and new_ip != old_ip:
+                        self.stdout.write(self.style.SUCCESS(
+                            f"Device found at new IP: {new_ip} (was {old_ip})"
+                        ))
+                        logger.info(f"Device IP changed: {old_ip} -> {new_ip}")
+                        attendance_url = build_attendance_url()
+                        consecutive_errors = 0  # Reset so we try the new IP immediately
+                    elif new_ip:
+                        self.stdout.write(self.style.WARNING(
+                            f"Device still at {new_ip} but not responding properly. Will retry..."
+                        ))
+                    else:
+                        self.stdout.write(self.style.ERROR(
+                            "No Hikvision device found on network. Will retry in 30 seconds..."
+                        ))
+                        time.sleep(25)  # Extra wait when device is completely gone
+
                 # Notify connected browsers that monitor is offline
                 broadcast_ws("monitor_status_change", {"status": "Offline", "error": err_str})
 
                 time.sleep(5)
 
-    def get_total_matches(self, url):
+    def get_total_matches(self, url, search_id):
         """Fetch total number of matches using a POST request as required by Hikvision API.
-        Returns 0 on any error or empty response.
+        Raises exception on error.
         """
         payload = {
             "AcsEventCond": {
-                "searchID": "1",
+                "searchID": search_id,
                 "searchResultPosition": 0,
                 "maxResults": 1,
                 "major": 5,
@@ -253,33 +291,31 @@ class Command(BaseCommand):
             logger.debug(f"POST total matches {url} status {r.status_code}")
             r.raise_for_status()
             if not r.text.strip():
-                logger.warning(f"Empty response for total matches from {url}")
-                return 0
+                raise ValueError("Empty response for total matches from device")
             data = r.json()
             return data.get("AcsEvent", {}).get("totalMatches", 0)
         except Exception as e:
             logger.warning(f"POST total matches failed ({e}), attempting GET fallback")
-            fallback_url = f"{url}&searchResultPosition=0&maxResults=1"
+            fallback_url = f"{url}&searchResultPosition=0&maxResults=1&searchID={search_id}"
             try:
                 r = session.get(fallback_url, timeout=15)
                 logger.debug(f"GET fallback total matches {fallback_url} status {r.status_code}")
                 r.raise_for_status()
                 if not r.text.strip():
-                    logger.warning(f"Empty response for total matches from {fallback_url}")
-                    return 0
+                    raise ValueError("Empty response for total matches (fallback)")
                 data = r.json()
                 return data.get("AcsEvent", {}).get("totalMatches", 0)
             except Exception as e2:
                 logger.error(f"Failed to get total matches via both POST and GET: {e2}")
-                return 0
+                raise e2
 
-    def get_events(self, url, position, max_results):
+    def get_events(self, url, position, max_results, search_id):
         """Retrieve a page of events using a POST request as required by Hikvision API.
-        Returns an empty dict on error.
+        Raises exception on error.
         """
         payload = {
             "AcsEventCond": {
-                "searchID": "1",
+                "searchID": search_id,
                 "searchResultPosition": position,
                 "maxResults": max_results,
                 "major": 5,
@@ -292,22 +328,20 @@ class Command(BaseCommand):
             logger.debug(f"POST events {url} position {position} max {max_results} status {r.status_code}")
             r.raise_for_status()
             if not r.text.strip():
-                logger.warning(f"Empty response for events from {url} at position {position}")
-                return {}
+                raise ValueError(f"Empty response for events at position {position}")
             return r.json()
         except Exception as e:
             logger.warning(f"POST events failed ({e}), attempting GET fallback")
-            fallback_url = f"{url}&searchResultPosition={position}&maxResults={max_results}"
+            fallback_url = f"{url}&searchResultPosition={position}&maxResults={max_results}&searchID={search_id}"
             try:
                 r = session.get(fallback_url, timeout=15)
                 logger.debug(f"GET fallback events {fallback_url} status {r.status_code}")
                 r.raise_for_status()
                 if not r.text.strip():
-                    logger.warning(f"Empty response for events from {fallback_url}")
-                    return {}
+                    raise ValueError(f"Empty response for events (fallback) at position {position}")
                 return r.json()
             except Exception as e2:
                 logger.error(f"Failed to get events via both POST and GET: {e2}")
-                return {}
+                raise e2
 
 

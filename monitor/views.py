@@ -553,19 +553,42 @@ def api_resend_webhook(request):
         date_str = None
         resend_all = False
 
-    if not date_str:
+    if not date_str or str(date_str).strip().lower() in ('day', 'today'):
         date_str = timezone.localtime(timezone.now()).strftime('%Y-%m-%d')
+    else:
+        date_str = str(date_str).strip().lower()
 
-    try:
-        target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return JsonResponse({"success": False, "message": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+    if date_str == 'all':
+        punches = PunchEvent.objects.all()
+    else:
+        target_date = None
+        now_date = timezone.localtime(timezone.now()).date()
+        # Check if date_str is just a day number like '11'
+        if date_str.isdigit():
+            day_num = int(date_str)
+            if 1 <= day_num <= 31:
+                try:
+                    target_date = datetime.date(now_date.year, now_date.month, day_num)
+                except ValueError:
+                    pass
 
-    tz = timezone.get_current_timezone()
-    start_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time.min), tz)
-    end_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time.max), tz)
+        if not target_date:
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y', '%Y/%m/%d'):
+                try:
+                    target_date = datetime.datetime.strptime(date_str, fmt).date()
+                    break
+                except ValueError:
+                    continue
 
-    punches = PunchEvent.objects.filter(time__gte=start_time, time__lte=end_time)
+        if not target_date:
+            return JsonResponse({"success": False, "message": "Invalid date format. Use YYYY-MM-DD, a day number like '11', or 'all'."}, status=400)
+
+        date_str = target_date.strftime('%Y-%m-%d')
+        tz = timezone.get_current_timezone()
+        start_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time.min), tz)
+        end_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time.max), tz)
+        punches = PunchEvent.objects.filter(time__gte=start_time, time__lte=end_time)
+
     if not resend_all:
         punches = punches.filter(shared_to_erp=False)
 
@@ -631,4 +654,100 @@ def api_resend_webhook(request):
         "failed": fail_count,
         "errors": errors[:10]
     })
+
+
+@csrf_exempt
+def api_webhook_mode(request):
+    """GET or POST to view/update webhook_send_mode ('auto' or 'manual')."""
+    from monitor.models import SystemStatus
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            mode = body.get('mode', 'auto').strip().lower()
+            if mode not in ('auto', 'manual'):
+                mode = 'auto'
+            SystemStatus.objects.update_or_create(key='webhook_send_mode', defaults={'value': mode})
+            return JsonResponse({"success": True, "mode": mode})
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
+    else:
+        status_obj = SystemStatus.objects.filter(key='webhook_send_mode').first()
+        mode = status_obj.value if status_obj else 'auto'
+        return JsonResponse({"success": True, "mode": mode})
+
+
+def api_webhook_pending(request):
+    """GET list of all pending/unsent attendance punches."""
+    try:
+        pending_qs = PunchEvent.objects.filter(shared_to_erp=False).order_by('-time')[:100]
+        total_count = PunchEvent.objects.filter(shared_to_erp=False).count()
+        items = []
+        for p in pending_qs:
+            items.append({
+                "id": p.id,
+                "serial_no": p.serial_no,
+                "employee_id": p.employee_id_str,
+                "name": p.name or (p.employee.name if p.employee else "Unknown"),
+                "time": timezone.localtime(p.time).strftime('%Y-%m-%d %I:%M:%S %p'),
+                "date_iso": p.time.strftime('%Y-%m-%d'),
+                "verify_mode": p.verify_mode or "Unknown"
+            })
+        return JsonResponse({
+            "success": True,
+            "total_pending": total_count,
+            "items": items
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def api_send_single_punch(request):
+    """Immediately send a single punch event by ID or serial_no to the ERP webhook."""
+    import requests
+    try:
+        body = json.loads(request.body)
+        punch_id = body.get('punch_id')
+        serial_no = body.get('serial_no')
+        if punch_id:
+            punch = PunchEvent.objects.filter(id=punch_id).first()
+        elif serial_no:
+            punch = PunchEvent.objects.filter(serial_no=serial_no).first()
+        else:
+            return JsonResponse({"success": False, "message": "Missing punch_id or serial_no"}, status=400)
+
+        if not punch:
+            return JsonResponse({"success": False, "message": "Punch event not found"}, status=404)
+
+        webhook_url = getattr(settings, 'ERP_WEBHOOK_URL', None)
+        if not webhook_url:
+            return JsonResponse({"success": False, "message": "ERP Webhook URL not configured"}, status=400)
+
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Natdemy-Attendance-System/1.0"
+        }
+        token = getattr(settings, 'ERP_WEBHOOK_TOKEN', None)
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        payload = {
+            "serial_no": punch.serial_no,
+            "employee_id": punch.employee_id_str,
+            "name": punch.name or (punch.employee.name if punch.employee else "Unknown"),
+            "time": punch.time.isoformat(),
+            "verify_mode": punch.verify_mode or "Unknown",
+        }
+
+        r = requests.post(webhook_url, json=payload, headers=headers, timeout=10)
+        if 200 <= r.status_code < 300:
+            punch.shared_to_erp = True
+            punch.save(update_fields=['shared_to_erp'])
+            return JsonResponse({"success": True, "message": f"Successfully sent punch #{punch.serial_no}"})
+        else:
+            return JsonResponse({"success": False, "message": f"ERP server error HTTP {r.status_code}: {r.text[:120]}"}, status=400)
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=500)
+
 

@@ -3,12 +3,116 @@ from requests.auth import HTTPDigestAuth
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 import urllib3
+import logging
+import concurrent.futures
+import socket
 from django.conf import settings
 from monitor.models import Employee, SystemStatus
 
 urllib3.disable_warnings()
+logger = logging.getLogger('monitor')
 
 _session = None
+_discovered_ip = None  # Cache for auto-discovered device IP
+
+
+def discover_device_ip(subnet_prefix=None):
+    """Scan the local /24 subnet to find the Hikvision access control device.
+    
+    Probes each IP with a quick POST to the ISAPI AccessControl endpoint.
+    A real Hikvision access control terminal responds with 401 (digest auth challenge).
+    Devices that redirect (302) or don't respond are skipped.
+    
+    Returns the discovered IP string or None.
+    """
+    if subnet_prefix is None:
+        # Derive subnet from configured IP
+        configured_ip = getattr(settings, 'HIKVISION_IP', '192.168.0.1')
+        parts = configured_ip.split('.')
+        subnet_prefix = '.'.join(parts[:3])
+
+    protocol = getattr(settings, 'HIKVISION_PROTOCOL', 'http')
+    test_payload = {
+        "AcsEventCond": {
+            "searchID": "1",
+            "searchResultPosition": 0,
+            "maxResults": 1,
+            "major": 5,
+            "minor": 38,
+        }
+    }
+
+    username = getattr(settings, 'HIKVISION_USERNAME', 'admin')
+    password = getattr(settings, 'HIKVISION_PASSWORD', '')
+
+    def probe_ip(host_num):
+        ip = f"{subnet_prefix}.{host_num}"
+        url = f"{protocol}://{ip}/ISAPI/AccessControl/AcsEvent?format=json"
+        try:
+            # Quick TCP port check first to skip offline hosts fast
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.5)
+            result = sock.connect_ex((ip, 80 if protocol == 'http' else 443))
+            sock.close()
+            if result != 0:
+                return None
+
+            # Try authenticating with our credentials — must return 200 to be our device
+            r = requests.post(
+                url,
+                json=test_payload,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                auth=HTTPDigestAuth(username, password),
+                timeout=3,
+                verify=False,
+                allow_redirects=False,
+            )
+            if r.status_code == 200:
+                return ip
+        except Exception:
+            pass
+        return None
+
+    logger.info(f"Auto-discovering Hikvision device on {subnet_prefix}.0/24 ...")
+
+    found_ips = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        results = executor.map(probe_ip, range(1, 255))
+        for ip in results:
+            if ip is not None:
+                found_ips.append(ip)
+
+    if found_ips:
+        ip = found_ips[0]
+        logger.info(f"Auto-discovered Hikvision device at {ip}")
+        return ip
+
+    logger.warning("Auto-discovery: No Hikvision access control device found on subnet")
+    return None
+
+
+def get_device_ip():
+    """Get the current working Hikvision device IP."""
+    global _discovered_ip
+    if _discovered_ip is not None:
+        return _discovered_ip
+    return settings.HIKVISION_IP
+
+
+def rediscover_device_ip():
+    """Force a network scan to find the device and update cached IP."""
+    global _discovered_ip
+    new_ip = discover_device_ip()
+    if new_ip:
+        _discovered_ip = new_ip
+        SystemStatus.objects.update_or_create(
+            key="device_ip",
+            defaults={"value": new_ip}
+        )
+        logger.info(f"Device IP updated to {new_ip}")
+        reset_device_session()
+    return new_ip
+
 
 def get_device_session():
     global _session
@@ -42,7 +146,7 @@ def reset_device_session():
         _session = None
 
 def sync_employees_from_device():
-    ip = settings.HIKVISION_IP
+    ip = get_device_ip()
     protocol = getattr(settings, 'HIKVISION_PROTOCOL', 'https')
     user_url = f"{protocol}://{ip}/ISAPI/AccessControl/UserInfo/Search?format=json"
     session = get_device_session()
