@@ -23,6 +23,7 @@ class PunchEvent(models.Model):
     verify_mode = models.CharField(max_length=100, blank=True, default='')
     logged_at = models.DateTimeField(auto_now_add=True)
     shared_to_erp = models.BooleanField(default=False)
+    erp_send_failed = models.BooleanField(default=False)  # True = permanent failure (e.g. ERP 404), skip future retries
 
     def __str__(self):
         return f"Punch {self.serial_no} - {self.name} ({self.time})"

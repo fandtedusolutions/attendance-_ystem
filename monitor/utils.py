@@ -168,7 +168,7 @@ def sync_employees_from_device():
             r = session.post(
                 user_url,
                 json=payload,
-                timeout=(5, 10)
+                timeout=(5, 30)
             )
             
             if r.status_code != 200:

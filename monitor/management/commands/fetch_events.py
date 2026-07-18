@@ -201,7 +201,7 @@ class Command(BaseCommand):
             }
         }
         session = get_device_session()
-        r = session.post(url, json=payload, timeout=10)
+        r = session.post(url, json=payload, timeout=45)
         r.raise_for_status()
         return r.json()["AcsEvent"]["totalMatches"]
 
@@ -216,6 +216,6 @@ class Command(BaseCommand):
             }
         }
         session = get_device_session()
-        r = session.post(url, json=payload, timeout=10)
+        r = session.post(url, json=payload, timeout=45)
         r.raise_for_status()
         return r.json()

@@ -149,7 +149,7 @@ def api_recover_today(request):
     try:
         payload = {"AcsEventCond": {"searchID": "1", "searchResultPosition": 0, "maxResults": 1, "major": 5, "minor": 38}}
         session = get_device_session()
-        r = session.post(url, json=payload, timeout=8)
+        r = session.post(url, json=payload, timeout=45)
         r.raise_for_status()
         if not r.text.strip():
             total = 0
@@ -158,7 +158,7 @@ def api_recover_today(request):
     except Exception as e:
         try:
             fallback_url = f"{url}&searchResultPosition=0&maxResults=1"
-            r = session.get(fallback_url, timeout=8)
+            r = session.get(fallback_url, timeout=45)
             r.raise_for_status()
             if not r.text.strip():
                 total = 0
@@ -178,7 +178,7 @@ def api_recover_today(request):
     for _ in range(max_pages):
         try:
             payload = {"AcsEventCond": {"searchID": "1", "searchResultPosition": scan_pos, "maxResults": page_size, "major": 5, "minor": 38}}
-            r = session.post(url, json=payload, timeout=10)
+            r = session.post(url, json=payload, timeout=45)
             r.raise_for_status()
             if not r.text.strip():
                 page_events = []
@@ -187,7 +187,7 @@ def api_recover_today(request):
         except Exception as e:
             try:
                 fallback_url = f"{url}&searchResultPosition={scan_pos}&maxResults={page_size}"
-                r = session.get(fallback_url, timeout=10)
+                r = session.get(fallback_url, timeout=45)
                 r.raise_for_status()
                 if not r.text.strip():
                     page_events = []
@@ -679,10 +679,15 @@ def api_webhook_mode(request):
 def api_webhook_pending(request):
     """GET list of all pending/unsent attendance punches."""
     try:
-        pending_qs = PunchEvent.objects.filter(shared_to_erp=False).order_by('-time')[:100]
-        total_count = PunchEvent.objects.filter(shared_to_erp=False).count()
+        # Retryable: not sent and not permanently failed
+        retryable_qs = PunchEvent.objects.filter(shared_to_erp=False, erp_send_failed=False).order_by('-time')[:100]
+        retryable_count = PunchEvent.objects.filter(shared_to_erp=False, erp_send_failed=False).count()
+        # Permanently failed (e.g. ERP 404 - employee not found)
+        perm_failed_count = PunchEvent.objects.filter(shared_to_erp=False, erp_send_failed=True).count()
+        total_count = retryable_count + perm_failed_count
+
         items = []
-        for p in pending_qs:
+        for p in retryable_qs:
             items.append({
                 "id": p.id,
                 "serial_no": p.serial_no,
@@ -690,11 +695,14 @@ def api_webhook_pending(request):
                 "name": p.name or (p.employee.name if p.employee else "Unknown"),
                 "time": timezone.localtime(p.time).strftime('%Y-%m-%d %I:%M:%S %p'),
                 "date_iso": p.time.strftime('%Y-%m-%d'),
-                "verify_mode": p.verify_mode or "Unknown"
+                "verify_mode": p.verify_mode or "Unknown",
+                "erp_send_failed": p.erp_send_failed,
             })
         return JsonResponse({
             "success": True,
             "total_pending": total_count,
+            "retryable_count": retryable_count,
+            "perm_failed_count": perm_failed_count,
             "items": items
         })
     except Exception as e:

@@ -1255,15 +1255,15 @@
                 const resp = await fetch('/api/webhook/pending/');
                 const data = await resp.json();
                 if (!data.success) return;
-                renderPendingList(data.items, data.total_pending);
+                renderPendingList(data.items, data.retryable_count ?? data.total_pending, data.perm_failed_count ?? 0);
             } catch(e) {}
         }
 
-        function renderPendingList(items, totalCount) {
+        function renderPendingList(items, retryableCount, permFailedCount) {
             const list = document.getElementById('pending-list');
             const badge = document.getElementById('pending-count-badge');
 
-            if (totalCount === 0) {
+            if (retryableCount === 0 && (permFailedCount === 0 || permFailedCount === undefined)) {
                 badge.className = 'pending-zero-badge';
                 badge.innerText = '0 Pending';
                 list.innerHTML = `<div class="pending-empty" id="pending-empty">
@@ -1274,8 +1274,19 @@
                 return;
             }
 
+            if (retryableCount === 0 && permFailedCount > 0) {
+                badge.className = 'pending-zero-badge';
+                badge.innerText = '0 Pending';
+                list.innerHTML = `<div class="pending-empty" id="pending-empty">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <p style="font-weight:600;margin-top:4px;">All deliverable punches sent!</p>
+                    <p style="font-size:0.78rem;margin-top:4px;color:var(--accent-amber);">&#9888; ${permFailedCount} punch${permFailedCount > 1 ? 'es' : ''} permanently failed (ERP returned 404 &mdash; employee not found in ERP system). These will not be retried.</p>
+                </div>`;
+                return;
+            }
+
             badge.className = 'pending-count-badge';
-            badge.innerText = totalCount + ' Pending';
+            badge.innerText = retryableCount + ' Pending';
 
             list.innerHTML = items.map(p => `
                 <div class="pending-item" id="pending-item-${p.id}">
@@ -1290,8 +1301,11 @@
                 </div>
             `).join('');
 
-            if (totalCount > items.length) {
-                list.innerHTML += `<div style="text-align:center;padding:0.75rem;font-size:0.78rem;color:var(--text-secondary)">Showing latest ${items.length} of ${totalCount} pending punches. Use "Send All Pending" to deliver all.</div>`;
+            if (retryableCount > items.length) {
+                list.innerHTML += `<div style="text-align:center;padding:0.75rem;font-size:0.78rem;color:var(--text-secondary)">Showing latest ${items.length} of ${retryableCount} pending punches. Use "Send All Pending" to deliver all.</div>`;
+            }
+            if (permFailedCount > 0) {
+                list.innerHTML += `<div style="text-align:center;padding:0.5rem 0.75rem;font-size:0.78rem;color:var(--accent-amber);border-top:1px solid rgba(245,158,11,0.15);margin-top:0.5rem;">&#9888; ${permFailedCount} punch${permFailedCount > 1 ? 'es' : ''} permanently failed (ERP 404 &mdash; employee not found). Not retried.</div>`;
             }
         }
 
@@ -1344,7 +1358,7 @@
 
         function refreshPendingCount() {
             fetch('/api/webhook/pending/').then(r => r.json()).then(data => {
-                if (data.success) renderPendingList(data.items, data.total_pending);
+                if (data.success) renderPendingList(data.items, data.retryable_count ?? data.total_pending, data.perm_failed_count ?? 0);
             }).catch(() => {});
         }
 

@@ -1,3 +1,5 @@
+name: attendance_system
+
 services:
   web:
     build: .
